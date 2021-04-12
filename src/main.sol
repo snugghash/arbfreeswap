@@ -1,22 +1,22 @@
-pragma solidity ^0.8.3;
+pragma solidity ^0.6.6;
 
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
-import "https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Pair.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol"
+import '@uniswap/v2-periphery/contracts/libraries/UniswapV2Library.sol';
 
-contract PriceConsumerV3 {
+
+contract ArbFreeSwap {
     string public message;
 
     AggregatorV3Interface internal priceFeed;
 
     /**
      * Network: Kovan
-     * Aggregator: LINK/ETH
-     * Address hardcoded
+     * Aggregator: BAT/ETH
+     * Address hardcoded from https://data.chain.link/link-eth
      */
     constructor(string memory initialMessage) public {
         message = initialMessage;
-        priceFeed = AggregatorV3Interface(0xDC530D9457755926550b59e8ECcdaE7624181557);
+        priceFeed = AggregatorV3Interface(0x0e4fcEC26c9f85c3D714370c98f43C4E02Fc35Ae);
     }
 
     function updateMessage(string memory newMessage) public {
@@ -24,7 +24,7 @@ contract PriceConsumerV3 {
     }
 
     /**
-     * Returns the latest price, but how do I get the bid/ask spread?
+     * Returns the latest off-chain price, but how do I get the bid/ask spread across all orderbook exchanges?
      */
     function getLatestPrice() public view returns (int) {
         (
@@ -40,22 +40,21 @@ contract PriceConsumerV3 {
     /**
      * calculate price based on pair reserves
      * https://ethereum.stackexchange.com/a/94173/
-     * 
-     * Probably switch to using V2 Oracles with time weighted price for this, using best execution price from https://uniswap.org/docs/v2/javascript-SDK/pricing/
+     * BAT?ETH pair address hardcoded
+     * BAT: 0x482dc9bb08111cb875109b075a40881e48ae02cd
+     * ETH: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
+     * Factory address on all networks 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f
      */
-    function getTokenPrice(address pairAddress, uint amount) public view returns(uint) {
-        IUniswapV2Pair pair = IUniswapV2Pair(pairAddress);
-        IERC20 token1 = IERC20(pair.token1);
-        (uint Res0, uint Res1,) = pair.getReserves();
+    function getTokenPrice() public view returns(uint) {
+        (uint256 ResA, uint256 ResB) = UniswapV2Library.getReserves(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f, 0x482dC9bB08111CB875109B075A40881E48aE02Cd,  0xd0A1E359811322d97991E03f863a0C30C2cF029C);
+        return (ResB*(10**18)/ResA);
+     }
 
-        // decimals
-        uint res0 = Res0*(10**token1.decimals());
-        return((amount*res0)/Res1); // return amount of token0 needed to buy token1
-    }
-
-    /** Return the higher price among the two (assuming buying), protecting LPs but still offering best price to consumers
-     */
-    function getBestPrice() public view returns(uint) {
-        return(max(getTokenPrice(), getLatestPrice()))
+     /** Return the higher price among the two (assuming buying), protecting LPs but still offering best price to consumers
+    //  */
+    function getBestBid() public view returns(uint) {
+        uint256 x = getTokenPrice();
+        uint256 y = uint256(getLatestPrice());
+        return x < y ? x : y;
     }
 }
