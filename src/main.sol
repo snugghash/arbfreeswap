@@ -40,21 +40,33 @@ contract ArbFreeSwap {
     /**
      * calculate price based on pair reserves
      * https://ethereum.stackexchange.com/a/94173/
-     * BAT?ETH pair address hardcoded
-     * BAT: 0x482dc9bb08111cb875109b075a40881e48ae02cd
-     * ETH: 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
+     * BAT/ETH pair address hardcoded
+     * BAT: 0x482dC9bB08111CB875109B075A40881E48aE02Cd
+     * ETH: 0xd0A1E359811322d97991E03f863a0C30C2cF029C
      * Factory address on all networks 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f
      */
-    function getTokenPrice() public view returns(uint) {
+    function getTokenBidPrice() public view returns(uint) {
         (uint256 ResA, uint256 ResB) = UniswapV2Library.getReserves(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f, 0x482dC9bB08111CB875109B075A40881E48aE02Cd,  0xd0A1E359811322d97991E03f863a0C30C2cF029C);
         return (ResB*(10**18)/ResA);
-     }
+    }
 
-     /** Return the higher price among the two (assuming buying), protecting LPs but still offering best price to consumers
-    //  */
+    function getTokenAskPrice() public view returns(uint) {
+        (uint256 ResA, uint256 ResB) = UniswapV2Library.getReserves(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f, 0x482dC9bB08111CB875109B075A40881E48aE02Cd,  0xd0A1E359811322d97991E03f863a0C30C2cF029C);
+        return (ResA/ResB/(10**18));
+    }
+
+     /** Return the lower price among the two (assuming consumer is selling), protecting LPs but still offering best price to consumers
+      * This assumes orderbook based markets are more accurately priced, since they can price in between the 15s windows.
+      */
     function getBestBid() public view returns(uint) {
-        uint256 x = getTokenPrice();
+        uint256 x = getTokenBidPrice();
         uint256 y = uint256(getLatestPrice());
         return x < y ? x : y;
+    }
+
+    function getBestAsk() public view returns(uint) {
+        uint256 x = getTokenAskPrice();
+        uint256 y = uint256(getLatestPrice());
+        return x > y ? x : y;
     }
 }
